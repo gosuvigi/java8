@@ -20,19 +20,27 @@ public class CaloricStream {
      * @param dishes
      * @return
      */
-    private List<String> lowCaloricDishes(List<Dish> dishes) {
-        groupByType(dishes);
-
+    private static List<String> lowCaloricDishes(List<Dish> dishes) {
         return dishes.stream()
-                .filter(d -> d.getCalories() < 400)
+                .filter(d -> {
+                    System.out.println("Filtering: " + d.getName() + " with calories: " + d.getCalories());
+                    return d.getCalories() > 300;
+                })
                 .sorted(comparing(Dish::getCalories))
-                .map(Dish::getName)
+                .map(d -> {
+                    System.out.println("Mapping: " + d.getName());
+                    return d.getName();
+                })
                 .collect(toList());
     }
 
-    private Map<Dish.Type, List<Dish>> groupByType(List<Dish> dishes) {
+    private static Map<Dish.Type, List<Dish>> groupByType(List<Dish> dishes) {
         return dishes.stream()
                 .collect(groupingBy(Dish::getType));
+    }
+
+    public static void main(String[] args) {
+        System.out.println(lowCaloricDishes(Dish.MENU));
     }
 
 }
