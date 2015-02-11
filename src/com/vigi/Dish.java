@@ -53,4 +53,14 @@ public class Dish {
     public boolean isVegetarian() {
         return vegetarian;
     }
+
+    @Override
+    public String toString() {
+        return "Dish{" +
+                "calories=" + calories +
+                ", name='" + name + '\'' +
+                ", type=" + type +
+                ", vegetarian=" + vegetarian +
+                '}';
+    }
 }
