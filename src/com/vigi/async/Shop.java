@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -18,7 +17,9 @@ public class Shop {
     private static final List<Shop> shops = Arrays.asList(new Shop("Hodor"),
             new Shop("Tyrion"),
             new Shop("Jon Snow"),
-            new Shop("Daenerys"));
+            new Shop("Daenerys"),
+            new Shop("Tywin"),
+            new Shop("Jaime"));
 
     private final String name;
 
@@ -44,9 +45,26 @@ public class Shop {
     }
 
     public static List<String> findPrices(String product) {
-        return shops.parallelStream()
-                .map(shop -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)))
+//        return shops.parallelStream()
+//                .map(shop -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)))
+//                .collect(toList());
+        List<CompletableFuture<String>> futures = shops.stream()
+                .map(shop -> CompletableFuture.supplyAsync(
+                        () -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)), executor()))
+                .peek(f -> System.out.println("Got result: " + f))
                 .collect(toList());
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(toList());
+    }
+
+    private static Executor executor() {
+        return Executors.newFixedThreadPool(Math.min(100, shops.size()),
+                r -> {
+                    Thread t = new Thread(r);
+                    t.setDaemon(true);
+                    return t;
+                });
     }
 
     private static void invokeAsync() {
