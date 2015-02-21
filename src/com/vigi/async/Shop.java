@@ -1,5 +1,7 @@
 package com.vigi.async;
 
+import com.vigi.Quote;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -22,18 +24,26 @@ public class Shop {
             new Shop("Jaime"));
 
     private final String name;
+    private final Random random = new Random();
 
     public Shop(String name) {
         this.name = name;
     }
 
-    public double getPrice(String product) {
+    public String getPrice(String product) {
+        double price = calculatePrice(product);
+        Discount.Code code = Discount.Code.values()[
+                random.nextInt(Discount.Code.values().length)];
+        return String.format("%s:%.2f:%s", name, price, code);
+    }
+
+    public double calculatePrice(String product) {
         delay();
-        return new Random().nextDouble() * product.charAt(0) + product.charAt(1);
+        return random.nextDouble() * product.charAt(0) + product.charAt(1);
     }
 
     public Future<Double> getPriceAsync(String product) {
-        return CompletableFuture.supplyAsync(() -> getPrice(product));
+        return CompletableFuture.supplyAsync(() -> calculatePrice(product));
     }
 
     private static void delay() {
@@ -45,16 +55,10 @@ public class Shop {
     }
 
     public static List<String> findPrices(String product) {
-//        return shops.parallelStream()
-//                .map(shop -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)))
-//                .collect(toList());
-        List<CompletableFuture<String>> futures = shops.stream()
-                .map(shop -> CompletableFuture.supplyAsync(
-                        () -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)), executor()))
-                .peek(f -> System.out.println("Got result: " + f))
-                .collect(toList());
-        return futures.stream()
-                .map(CompletableFuture::join)
+        return shops.stream()
+                .map(shop -> shop.getPrice(product))
+                .map(Quote::parse)
+                .map(Discount::applyDiscount)
                 .collect(toList());
     }
 
