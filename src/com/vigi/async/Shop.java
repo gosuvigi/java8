@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -25,6 +26,7 @@ public class Shop {
 
     private final String name;
     private final Random random = new Random();
+    private static final Executor executor = executor();
 
     public Shop(String name) {
         this.name = name;
@@ -55,10 +57,23 @@ public class Shop {
     }
 
     public static List<String> findPrices(String product) {
-        return shops.stream()
-                .map(shop -> shop.getPrice(product))
-                .map(Quote::parse)
-                .map(Discount::applyDiscount)
+        Function<Shop, CompletableFuture<String>> asyncPrice = shop -> CompletableFuture.supplyAsync(
+                () -> shop.getPrice(product), executor
+        );
+        // pipeline two asynchronous operations, passing the result of the first
+        // operation to the second operation when it becomes available
+        Function<CompletableFuture<Quote>, CompletableFuture<String>> asyncDiscount = future -> future.thenCompose(quote ->
+                CompletableFuture.supplyAsync(
+                        () -> Discount.applyDiscount(quote), executor
+                ));
+        List<CompletableFuture<String>> priceFuture = shops.stream()
+                .map(asyncPrice)
+                .map(future -> future.thenApply(Quote::parse))
+                // future composition is applied here
+                .map(asyncDiscount)
+                .collect(toList());
+        return priceFuture.stream()
+                .map(CompletableFuture::join)
                 .collect(toList());
     }
 
@@ -91,10 +106,10 @@ public class Shop {
     private static void doSomethingElse() {
         Stream<String> stream = IntStream.rangeClosed(1, 1_000_000)
                 .boxed()
-                .map(i -> String.valueOf(i));
+                .map(String::valueOf);
         stream.limit(1000)
                 .filter(s -> s.length() > 3)
-                .forEach(i -> System.out.println(i));
+                .forEach(System.out::println);
     }
 
     public static void main(String[] args) {
