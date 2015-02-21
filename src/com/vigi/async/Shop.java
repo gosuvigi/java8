@@ -1,14 +1,30 @@
 package com.vigi.async;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * Created by vigi on 2/21/2015.
  */
 public class Shop {
+
+    private static final List<Shop> shops = Arrays.asList(new Shop("Hodor"),
+            new Shop("Tyrion"),
+            new Shop("Jon Snow"),
+            new Shop("Daenerys"));
+
+    private final String name;
+
+    public Shop(String name) {
+        this.name = name;
+    }
 
     public double getPrice(String product) {
         delay();
@@ -16,19 +32,10 @@ public class Shop {
     }
 
     public Future<Double> getPriceAsync(String product) {
-        CompletableFuture<Double> futurePrice = new CompletableFuture<>();
-        new Thread(() -> {
-            try {
-                double price = getPrice(product);
-                futurePrice.complete(price);
-            } catch (Exception e) {
-                futurePrice.completeExceptionally(e);
-            }
-        }).start();
-        return futurePrice;
+        return CompletableFuture.supplyAsync(() -> getPrice(product));
     }
 
-    public static void delay() {
+    private static void delay() {
         try {
             Thread.sleep(1000);
         } catch (InterruptedException e) {
@@ -36,8 +43,14 @@ public class Shop {
         }
     }
 
+    public static List<String> findPrices(String product) {
+        return shops.parallelStream()
+                .map(shop -> String.format("%s price is %.2f", shop.name, shop.getPrice(product)))
+                .collect(toList());
+    }
+
     private static void invokeAsync() {
-        Shop shop = new Shop();
+        Shop shop = new Shop("hodor?");
         long start = System.nanoTime();
         Future<Double> price = shop.getPriceAsync("Hodor");
         long end = (System.nanoTime() - start) / 1_000_000;
@@ -63,6 +76,9 @@ public class Shop {
     }
 
     public static void main(String[] args) {
-        invokeAsync();
+        long start = System.nanoTime();
+        System.out.println("Prices: " + findPrices("Hodor"));
+        long end = (System.nanoTime() - start) / 1_000_000;
+        System.out.println("It took: " + end + " millis.");
     }
 }
