@@ -3,11 +3,14 @@ package com.vigi.async;
 import com.vigi.Quote;
 
 import java.util.List;
+import java.util.Random;
 
 /**
  * Created by vigi on 2/21/2015.
  */
 public class Discount {
+
+    private static final Random random = new Random();
 
     public static enum Code {
 
@@ -34,8 +37,9 @@ public class Discount {
     }
 
     private static void delay() {
+        int delay = 500 + random.nextInt(2000);
         try {
-            Thread.sleep(1000);
+            Thread.sleep(delay);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

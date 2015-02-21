@@ -23,10 +23,10 @@ public class Shop {
             new Shop("Daenerys"),
             new Shop("Tywin"),
             new Shop("Jaime"));
+    private static final Random random = new Random();
+    private static final Executor executor = executor();
 
     private final String name;
-    private final Random random = new Random();
-    private static final Executor executor = executor();
 
     public Shop(String name) {
         this.name = name;
@@ -49,32 +49,36 @@ public class Shop {
     }
 
     private static void delay() {
+        int delay = 500 + random.nextInt(2000);
         try {
-            Thread.sleep(1000);
+            Thread.sleep(delay);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
     public static List<String> findPrices(String product) {
+        List<CompletableFuture<String>> priceFuture = findPricesStream(product)
+                .collect(toList());
+        return priceFuture.stream()
+                .map(CompletableFuture::join)
+                .collect(toList());
+    }
+
+    public static Stream<CompletableFuture<String>> findPricesStream(String product) {
         Function<Shop, CompletableFuture<String>> asyncPrice = shop -> CompletableFuture.supplyAsync(
                 () -> shop.getPrice(product), executor
         );
         // pipeline two asynchronous operations, passing the result of the first
         // operation to the second operation when it becomes available
-        Function<CompletableFuture<Quote>, CompletableFuture<String>> asyncDiscount = future -> future.thenCompose(quote ->
-                CompletableFuture.supplyAsync(
+        Function<CompletableFuture<Quote>, CompletableFuture<String>> asyncDiscount = f -> f.thenCompose(
+                quote -> CompletableFuture.supplyAsync(
                         () -> Discount.applyDiscount(quote), executor
                 ));
-        List<CompletableFuture<String>> priceFuture = shops.stream()
+        return shops.stream()
                 .map(asyncPrice)
-                .map(future -> future.thenApply(Quote::parse))
-                // future composition is applied here
-                .map(asyncDiscount)
-                .collect(toList());
-        return priceFuture.stream()
-                .map(CompletableFuture::join)
-                .collect(toList());
+                .map(f -> f.thenApply(Quote::parse))
+                .map(asyncDiscount);
     }
 
     private static Executor executor() {
@@ -114,8 +118,12 @@ public class Shop {
 
     public static void main(String[] args) {
         long start = System.nanoTime();
-        System.out.println("Prices: " + findPrices("Hodor"));
-        long end = (System.nanoTime() - start) / 1_000_000;
-        System.out.println("It took: " + end + " millis.");
+        CompletableFuture[] futures = findPricesStream("Hodor")
+                .map(f -> f.thenAccept(s -> System.out.println(s + " (done in " +
+                        ((System.nanoTime() - start) / 1_000_000) + " msecs)")))
+                .toArray(size -> new CompletableFuture[size]);
+        CompletableFuture.allOf(futures).join();
+        System.out.println("All shops have now responded in "
+                + ((System.nanoTime() - start) / 1_000_000) + " msecs");
     }
 }
